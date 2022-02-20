@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import {
   createAssociatedTokenAccountInstruction,
   createMint,
@@ -16,7 +17,7 @@ import {
   WalletSigner,
   Attribute,
   getAssetCostToStore,
-  ARWEAVE_UPLOAD_ENDPOINT
+  ARWEAVE_UPLOAD_ENDPOINT,
 } from '@oyster/common';
 import React, { Dispatch, SetStateAction } from 'react';
 import { MintLayout, Token } from '@solana/spl-token';
@@ -45,14 +46,11 @@ interface IArweaveResult {
 }
 
 const uploadToArweave = async (data: FormData): Promise<IArweaveResult> => {
-  const resp = await fetch(
-    ARWEAVE_UPLOAD_ENDPOINT,
-    {
-      method: 'POST',
-      // @ts-ignore
-      body: data,
-    },
-  );
+  const resp = await fetch(ARWEAVE_UPLOAD_ENDPOINT, {
+    method: 'POST',
+    // @ts-ignore
+    body: data,
+  });
 
   if (!resp.ok) {
     return Promise.reject(
@@ -106,14 +104,16 @@ export const mintNFT = async (
     external_url: metadata.external_url,
     properties: {
       ...metadata.properties,
-      creators: metadata.creators?.map(creator => {
-        return {
-          address: creator.address,
-          share: creator.share,
-        };
-      }),
     },
+    creators: metadata.creators?.map(creator => {
+      return {
+        address: creator.address,
+        share: creator.share,
+      };
+    }),
   };
+
+  console.log(metadataContent);
 
   const realFiles: File[] = [
     ...files,
@@ -142,6 +142,8 @@ export const mintNFT = async (
   const payerPublicKey = wallet.publicKey.toBase58();
   const instructions: TransactionInstruction[] = [...pushInstructions];
   const signers: Keypair[] = [...pushSigners];
+
+  console.log('SIGNERS: ', signers);
 
   // This is only temporarily owned by wallet...transferred to program by createMasterEdition below
   const mintKey = createMint(
@@ -174,14 +176,18 @@ export const mintNFT = async (
     toPublicKey(mintKey),
   );
 
+  const mData = new Data({
+    symbol: metadata.symbol,
+    name: metadata.name,
+    uri: 'https://arweave.net/nhjGl6alIKUbS9MmkYRCaf1MjjTtDEGtuSF42gaIW7k', // uri: ' '.repeat(64), // size of url for arweave
+    sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
+    creators: metadata.creators,
+  });
+
+  console.log(mData);
+
   const metadataAccount = await createMetadata(
-    new Data({
-      symbol: metadata.symbol,
-      name: metadata.name,
-      uri: ' '.repeat(64), // size of url for arweave
-      sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
-      creators: metadata.creators,
-    }),
+    mData,
     payerPublicKey,
     mintKey,
     payerPublicKey,
@@ -189,6 +195,8 @@ export const mintNFT = async (
     wallet.publicKey.toBase58(),
   );
   progressCallback(2);
+
+  console.log('metadata:', metadataAccount);
 
   // TODO: enable when using payer account to avoid 2nd popup
   // const block = await connection.getRecentBlockhash('singleGossip');
@@ -207,6 +215,7 @@ export const mintNFT = async (
     signers,
     'single',
   );
+  console.log('txid:', txid);
   progressCallback(3);
 
   try {
@@ -223,119 +232,122 @@ export const mintNFT = async (
   progressCallback(5);
 
   // this means we're done getting AR txn setup. Ship it off to ARWeave!
-  const data = new FormData();
-  data.append('transaction', txid);
-  data.append('env', endpoint);
+  // const data = new FormData();
+  // data.append('transaction', txid);
+  // data.append('env', endpoint);
 
-  const tags = realFiles.reduce(
-    (acc: Record<string, Array<{ name: string; value: string }>>, f) => {
-      acc[f.name] = [{ name: 'mint', value: mintKey }];
-      return acc;
-    },
-    {},
-  );
-  data.append('tags', JSON.stringify(tags));
-  realFiles.map(f => data.append('file[]', f));
+  // const tags = realFiles.reduce(
+  //   (acc: Record<string, Array<{ name: string; value: string }>>, f) => {
+  //     acc[f.name] = [{ name: 'mint', value: mintKey }];
+  //     return acc;
+  //   },
+  //   {},
+  // );
+  // data.append('tags', JSON.stringify(tags));
+  // realFiles.map(f => data.append('file[]', f));
 
-  // TODO: convert to absolute file name for image
+  // // TODO: convert to absolute file name for image
 
-  const result: IArweaveResult = await uploadToArweave(data);
+  // const result: IArweaveResult = await uploadToArweave(data);
   progressCallback(6);
 
-  const metadataFile = result.messages?.find(
-    m => m.filename === RESERVED_TXN_MANIFEST,
+  //   const metadataFile = result.messages?.find(
+  //     m => m.filename === RESERVED_TXN_MANIFEST,
+  //   );
+  //   if (metadataFile?.transactionId && wallet.publicKey) {
+  const updateInstructions: TransactionInstruction[] = [];
+  const updateSigners: Keypair[] = [];
+
+  //     // TODO: connect to testnet arweave
+  //     const arweaveLink = `https://arweave.net/${metadataFile.transactionId}`;
+  // await updateMetadata(
+  //   new Data({
+  //     name: metadata.name,
+  //     symbol: metadata.symbol,
+  //     uri: 'https://arweave.net/nhjGl6alIKUbS9MmkYRCaf1MjjTtDEGtuSF42gaIW7k',
+  //     creators: metadata.creators,
+  //     sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
+  //   }),
+  //   undefined,
+  //   undefined,
+  //   mintKey,
+  //   payerPublicKey,
+  //   updateInstructions,
+  //   metadataAccount,
+  // );
+
+  updateInstructions.push(
+    Token.createMintToInstruction(
+      TOKEN_PROGRAM_ID,
+      toPublicKey(mintKey),
+      toPublicKey(recipientKey),
+      toPublicKey(payerPublicKey),
+      [],
+      1,
+    ),
   );
-  if (metadataFile?.transactionId && wallet.publicKey) {
-    const updateInstructions: TransactionInstruction[] = [];
-    const updateSigners: Keypair[] = [];
 
-    // TODO: connect to testnet arweave
-    const arweaveLink = `https://arweave.net/${metadataFile.transactionId}`;
-    await updateMetadata(
-      new Data({
-        name: metadata.name,
-        symbol: metadata.symbol,
-        uri: arweaveLink,
-        creators: metadata.creators,
-        sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
-      }),
-      undefined,
-      undefined,
-      mintKey,
-      payerPublicKey,
-      updateInstructions,
-      metadataAccount,
-    );
+  progressCallback(7);
+  // // In this instruction, mint authority will be removed from the main mint, while
+  // // minting authority will be maintained for the Printing mint (which we want.)
+  await createMasterEdition(
+    maxSupply !== undefined ? new BN(maxSupply) : undefined,
+    mintKey,
+    payerPublicKey,
+    payerPublicKey,
+    payerPublicKey,
+    updateInstructions,
+  );
 
-    updateInstructions.push(
-      Token.createMintToInstruction(
-        TOKEN_PROGRAM_ID,
-        toPublicKey(mintKey),
-        toPublicKey(recipientKey),
-        toPublicKey(payerPublicKey),
-        [],
-        1,
-      ),
-    );
+  //     // TODO: enable when using payer account to avoid 2nd popup
+  //     /*  if (maxSupply !== undefined)
+  //       updateInstructions.push(
+  //         setAuthority({
+  //           target: authTokenAccount,
+  //           currentAuthority: payerPublicKey,
+  //           newAuthority: wallet.publicKey,
+  //           authorityType: 'AccountOwner',
+  //         }),
+  //       );
+  // */
+  //     // TODO: enable when using payer account to avoid 2nd popup
+  //     // Note with refactoring this needs to switch to the updateMetadataAccount command
+  //     // await transferUpdateAuthority(
+  //     //   metadataAccount,
+  //     //   payerPublicKey,
+  //     //   wallet.publicKey,
+  //     //   updateInstructions,
+  //     // );
 
-    progressCallback(7);
-    // // In this instruction, mint authority will be removed from the main mint, while
-    // // minting authority will be maintained for the Printing mint (which we want.)
-    await createMasterEdition(
-      maxSupply !== undefined ? new BN(maxSupply) : undefined,
-      mintKey,
-      payerPublicKey,
-      payerPublicKey,
-      payerPublicKey,
-      updateInstructions,
-    );
+  progressCallback(8);
 
-    // TODO: enable when using payer account to avoid 2nd popup
-    /*  if (maxSupply !== undefined)
-      updateInstructions.push(
-        setAuthority({
-          target: authTokenAccount,
-          currentAuthority: payerPublicKey,
-          newAuthority: wallet.publicKey,
-          authorityType: 'AccountOwner',
-        }),
-      );
-*/
-    // TODO: enable when using payer account to avoid 2nd popup
-    // Note with refactoring this needs to switch to the updateMetadataAccount command
-    // await transferUpdateAuthority(
-    //   metadataAccount,
-    //   payerPublicKey,
-    //   wallet.publicKey,
-    //   updateInstructions,
-    // );
+  //     // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const txid2 = await sendTransactionWithRetry(
+    connection,
+    wallet,
+    updateInstructions,
+    updateSigners,
+  );
 
-    progressCallback(8);
+  console.log('txid2:', txid2);
 
-    const txid = await sendTransactionWithRetry(
-      connection,
-      wallet,
-      updateInstructions,
-      updateSigners,
-    );
+  //     notify({
+  //       message: 'Art created on Solana',
+  //       description: (
+  //         <a href={arweaveLink} target="_blank" rel="noopener noreferrer">
+  //           Arweave Link
+  //         </a>
+  //       ),
+  //       type: 'success',
+  //     });
 
-    notify({
-      message: 'Art created on Solana',
-      description: (
-        <a href={arweaveLink} target="_blank" rel="noopener noreferrer">
-          Arweave Link
-        </a>
-      ),
-      type: 'success',
-    });
+  //     // TODO: refund funds
 
-    // TODO: refund funds
-
-    // send transfer back to user
-  }
-  // TODO:
-  // 1. Jordan: --- upload file and metadata to storage API
-  // 2. pay for storage by hashing files and attaching memo for each file
+  //     // send transfer back to user
+  //   }
+  //   // TODO:
+  //   // 1. Jordan: --- upload file and metadata to storage API
+  //   // 2. pay for storage by hashing files and attaching memo for each file
 
   return { metadataAccount };
 };
@@ -343,6 +355,7 @@ export const mintNFT = async (
 export const prepPayForFilesTxn = async (
   wallet: WalletSigner,
   files: File[],
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   metadata: any,
 ): Promise<{
   instructions: TransactionInstruction[];

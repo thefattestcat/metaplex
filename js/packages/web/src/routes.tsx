@@ -58,7 +58,6 @@ export function Routes() {
             <Route exact path="/art/:id" component={() => <ArtView />} />
             <Route exact path="/artists/:id" component={() => <ArtistView />} />
             <Route exact path="/artists" component={() => <ArtistsView />} />
-
             <Route
               exact
               path="/auction/create/:step_param?"
@@ -75,7 +74,7 @@ export function Routes() {
               component={() => <BillingView />}
             />
             <Route path="/about" component={() => <StaticPageView />} />
-            <Route path="/" component={() => <HomeView />} />
+            <Route path="/" component={() => <HomeView />} /> {/** Our view */}
           </Switch>
         </Providers>
       </HashRouter>

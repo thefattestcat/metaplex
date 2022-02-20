@@ -450,6 +450,57 @@ export const METADATA_SCHEMA = new Map<any, any>([
   ],
 ]);
 
+const DATA = new Map<any, { kind: string; fields: any }>([
+  [
+    UpdateMetadataArgs,
+    {
+      kind: 'struct',
+      fields: [
+        // ['instruction', 'u8'],
+        ['data', Data],
+        // ['isMutable', 'u8'], // bool
+        ['updateAuthority', 'string'],
+        ['primarySaleHappened', 'u8'],
+      ],
+    },
+  ],
+  [
+    CreateMetadataArgs,
+    {
+      kind: 'struct',
+      fields: [
+        ['instruction', 'u8'],
+        ['data', Data],
+        ['isMutable', 'u8'], // bool
+      ],
+    },
+  ],
+  [
+    Data,
+    {
+      kind: 'struct',
+      fields: [
+        ['name', 'string'],
+        ['symbol', 'string'],
+        ['uri', 'string'],
+        ['sellerFeeBasisPoints', 'u16'],
+        ['creators', 'u8'],
+      ],
+    },
+  ],
+  [
+    Creator,
+    {
+      kind: 'struct',
+      fields: [
+        ['address', 'pubkeyAsString'],
+        ['verified', 'u8'],
+        ['share', 'u8'],
+      ],
+    },
+  ],
+]);
+
 // eslint-disable-next-line no-control-regex
 const METADATA_REPLACE = new RegExp('\u0000', 'g');
 
@@ -528,7 +579,7 @@ export async function updateMetadata(
         ? null
         : primarySaleHappened,
   });
-  const txnData = Buffer.from(serialize(METADATA_SCHEMA, value));
+  const txnData = Buffer.from(serialize(DATA, value));
   const keys = [
     {
       pubkey: toPublicKey(metadataAccount),
@@ -560,6 +611,7 @@ export async function createMetadata(
   instructions: TransactionInstruction[],
   payer: StringPublicKey,
 ) {
+  console.log('DATA', DATA);
   const metadataProgramId = programIds().metadata;
 
   const metadataAccount = (
@@ -574,7 +626,9 @@ export async function createMetadata(
   )[0];
   console.log('Data', data);
   const value = new CreateMetadataArgs({ data, isMutable: true });
-  const txnData = Buffer.from(serialize(METADATA_SCHEMA, value));
+
+  console.log('value:', value);
+  const txnData = Buffer.from(serialize(DATA, value));
 
   const keys = [
     {
