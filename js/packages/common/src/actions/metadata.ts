@@ -7,6 +7,13 @@ import { programIds } from '../utils/programIds';
 import { deserializeUnchecked, serialize } from 'borsh';
 import BN from 'bn.js';
 import { findProgramAddress, StringPublicKey, toPublicKey } from '../utils';
+import {
+  CreateMasterEditionV3Args,
+  CreateMetadataV2Args,
+  DataV2,
+  UpdateMetadataV2Args,
+  MetadataData,
+} from '@metaplex-foundation/mpl-token-metadata';
 export const METADATA_PREFIX = 'metadata';
 export const EDITION = 'edition';
 export const RESERVATION = 'reservation';
@@ -70,7 +77,7 @@ export type Attribute = {
 export interface IMetadataExtension {
   name: string;
   symbol: string;
-
+  collection: string;
   creators: Creator[] | null;
   description: string;
   // preview image absolute URI
@@ -450,6 +457,7 @@ export const METADATA_SCHEMA = new Map<any, any>([
   ],
 ]);
 
+<<<<<<< HEAD
 const DATA = new Map<any, { kind: string; fields: any }>([
   [
     UpdateMetadataArgs,
@@ -504,16 +512,10 @@ const DATA = new Map<any, { kind: string; fields: any }>([
 // eslint-disable-next-line no-control-regex
 const METADATA_REPLACE = new RegExp('\u0000', 'g');
 
+=======
+>>>>>>> 807935e3b1188fa1c30e82c04658e791a5862544
 export const decodeMetadata = (buffer: Buffer): Metadata => {
-  const metadata = deserializeUnchecked(
-    METADATA_SCHEMA,
-    Metadata,
-    buffer,
-  ) as Metadata;
-  metadata.data.name = metadata.data.name.replace(METADATA_REPLACE, '');
-  metadata.data.uri = metadata.data.uri.replace(METADATA_REPLACE, '');
-  metadata.data.symbol = metadata.data.symbol.replace(METADATA_REPLACE, '');
-  return metadata;
+  return MetadataData.deserialize(buffer);
 };
 
 export const decodeEditionMarker = (buffer: Buffer): EditionMarker => {
@@ -547,7 +549,7 @@ export const decodeMasterEdition = (
   }
 };
 
-export async function updateMetadata(
+export async function deprecatedUpdateMetadata(
   data: Data | undefined,
   newUpdateAuthority: string | undefined,
   primarySaleHappened: boolean | null | undefined,
@@ -603,7 +605,74 @@ export async function updateMetadata(
   return metadataAccount;
 }
 
-export async function createMetadata(
+export async function updateMetadataV2(
+  data: DataV2 | undefined,
+  newUpdateAuthority: string | undefined,
+  primarySaleHappened: boolean | null | undefined,
+  mintKey: StringPublicKey,
+  updateAuthority: StringPublicKey,
+  instructions: TransactionInstruction[],
+  metadataAccount?: StringPublicKey,
+  isMutable?: boolean,
+) {
+  const metadataProgramId = programIds().metadata;
+
+  metadataAccount =
+    metadataAccount ||
+    (
+      await findProgramAddress(
+        [
+          Buffer.from('metadata'),
+          toPublicKey(metadataProgramId).toBuffer(),
+          toPublicKey(mintKey).toBuffer(),
+        ],
+        toPublicKey(metadataProgramId),
+      )
+    )[0];
+
+  const value = new UpdateMetadataV2Args({
+    data,
+    updateAuthority: !newUpdateAuthority ? undefined : newUpdateAuthority,
+    primarySaleHappened:
+      primarySaleHappened === null || primarySaleHappened === undefined
+        ? null
+        : primarySaleHappened,
+    isMutable: typeof isMutable == 'boolean' ? isMutable : null,
+  });
+  const txnData = Buffer.from(
+    serialize(
+      new Map([
+        DataV2.SCHEMA,
+        ...METADATA_SCHEMA,
+        ...UpdateMetadataV2Args.SCHEMA,
+      ]),
+      value,
+    ),
+  );
+  const keys = [
+    {
+      pubkey: toPublicKey(metadataAccount),
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: toPublicKey(updateAuthority),
+      isSigner: true,
+      isWritable: false,
+    },
+  ];
+  instructions.push(
+    new TransactionInstruction({
+      keys,
+      programId: toPublicKey(metadataProgramId),
+      data: txnData,
+    }),
+  );
+
+  return metadataAccount;
+}
+
+export async function deprecatedCreateMetadata(
   data: Data,
   updateAuthority: StringPublicKey,
   mintKey: StringPublicKey,
@@ -678,7 +747,190 @@ export async function createMetadata(
   return metadataAccount;
 }
 
-export async function createMasterEdition(
+export async function createMetadataV2(
+  data: DataV2,
+  updateAuthority: StringPublicKey,
+  mintKey: StringPublicKey,
+  mintAuthorityKey: StringPublicKey,
+  instructions: TransactionInstruction[],
+  payer: StringPublicKey,
+) {
+  const metadataProgramId = programIds().metadata;
+
+  const metadataAccount = (
+    await findProgramAddress(
+      [
+        Buffer.from('metadata'),
+        toPublicKey(metadataProgramId).toBuffer(),
+        toPublicKey(mintKey).toBuffer(),
+      ],
+      toPublicKey(metadataProgramId),
+    )
+  )[0];
+  console.log('Metadata V2', data);
+  const txnData = Buffer.from(
+    serialize(
+      new Map([
+        DataV2.SCHEMA,
+        ...METADATA_SCHEMA,
+        ...CreateMetadataV2Args.SCHEMA,
+      ]),
+      new CreateMetadataV2Args({ data, isMutable: true }),
+    ),
+  );
+
+  const keys = [
+    {
+      pubkey: toPublicKey(metadataAccount),
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: toPublicKey(mintKey),
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: toPublicKey(mintAuthorityKey),
+      isSigner: true,
+      isWritable: false,
+    },
+    {
+      pubkey: toPublicKey(payer),
+      isSigner: true,
+      isWritable: false,
+    },
+    {
+      pubkey: toPublicKey(updateAuthority),
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: SystemProgram.programId,
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: SYSVAR_RENT_PUBKEY,
+      isSigner: false,
+      isWritable: false,
+    },
+  ];
+  instructions.push(
+    new TransactionInstruction({
+      keys,
+      programId: toPublicKey(metadataProgramId),
+      data: txnData,
+    }),
+  );
+
+  return metadataAccount;
+}
+
+export async function createMasterEditionV3(
+  maxSupply: BN | undefined,
+  mintKey: StringPublicKey,
+  updateAuthorityKey: StringPublicKey,
+  mintAuthorityKey: StringPublicKey,
+  payer: StringPublicKey,
+  instructions: TransactionInstruction[],
+) {
+  const metadataProgramId = programIds().metadata;
+
+  const metadataAccount = (
+    await findProgramAddress(
+      [
+        Buffer.from(METADATA_PREFIX),
+        toPublicKey(metadataProgramId).toBuffer(),
+        toPublicKey(mintKey).toBuffer(),
+      ],
+      toPublicKey(metadataProgramId),
+    )
+  )[0];
+
+  const editionAccount = (
+    await findProgramAddress(
+      [
+        Buffer.from(METADATA_PREFIX),
+        toPublicKey(metadataProgramId).toBuffer(),
+        toPublicKey(mintKey).toBuffer(),
+        Buffer.from(EDITION),
+      ],
+      toPublicKey(metadataProgramId),
+    )
+  )[0];
+
+  const value = new CreateMasterEditionV3Args({ maxSupply: maxSupply || null });
+  const txnData = Buffer.from(
+    serialize(
+      new Map([
+        DataV2.SCHEMA,
+        ...METADATA_SCHEMA,
+        ...CreateMasterEditionV3Args.SCHEMA,
+      ]),
+      value,
+    ),
+  );
+
+  const keys = [
+    {
+      pubkey: toPublicKey(editionAccount),
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: toPublicKey(mintKey),
+      isSigner: false,
+      isWritable: true,
+    },
+    {
+      pubkey: toPublicKey(updateAuthorityKey),
+      isSigner: true,
+      isWritable: false,
+    },
+    {
+      pubkey: toPublicKey(mintAuthorityKey),
+      isSigner: true,
+      isWritable: false,
+    },
+    {
+      pubkey: toPublicKey(payer),
+      isSigner: true,
+      isWritable: false,
+    },
+    {
+      pubkey: toPublicKey(metadataAccount),
+      isSigner: false,
+      isWritable: false,
+    },
+
+    {
+      pubkey: programIds().token,
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: SystemProgram.programId,
+      isSigner: false,
+      isWritable: false,
+    },
+    {
+      pubkey: SYSVAR_RENT_PUBKEY,
+      isSigner: false,
+      isWritable: false,
+    },
+  ];
+
+  instructions.push(
+    new TransactionInstruction({
+      keys,
+      programId: toPublicKey(metadataProgramId),
+      data: txnData,
+    }),
+  );
+}
+
+export async function deprecatedCreateMasterEdition(
   maxSupply: BN | undefined,
   mintKey: StringPublicKey,
   updateAuthorityKey: StringPublicKey,

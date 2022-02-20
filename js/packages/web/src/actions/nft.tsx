@@ -1,17 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
+  ARWEAVE_UPLOAD_ENDPOINT,
+  Attribute,
   createAssociatedTokenAccountInstruction,
+  createMasterEditionV3,
+  createMetadataV2,
+  updateMetadataV2,
   createMint,
-  createMetadata,
-  programIds,
-  notify,
-  ENDPOINT_NAME,
-  updateMetadata,
-  createMasterEdition,
-  sendTransactionWithRetry,
-  Data,
   Creator,
+  ENDPOINT_NAME,
   findProgramAddress,
+  getAssetCostToStore,
+  notify,
+  programIds,
+  sendTransactionWithRetry,
   StringPublicKey,
   toPublicKey,
   WalletSigner,
@@ -22,8 +24,9 @@ import {
 import React, { Dispatch, SetStateAction } from 'react';
 import { MintLayout, Token } from '@solana/spl-token';
 import {
-  Keypair,
   Connection,
+  Keypair,
+  PublicKey,
   SystemProgram,
   TransactionInstruction,
 } from '@solana/web3.js';
@@ -31,6 +34,11 @@ import crypto from 'crypto';
 
 import { AR_SOL_HOLDER_ID } from '../utils/ids';
 import BN from 'bn.js';
+import {
+  Collection,
+  DataV2,
+  Uses,
+} from '@metaplex-foundation/mpl-token-metadata';
 
 const RESERVED_TXN_MANIFEST = 'manifest.json';
 const RESERVED_METADATA = 'metadata.json';
@@ -85,6 +93,8 @@ export const mintNFT = async (
     properties: any;
     creators: Creator[] | null;
     sellerFeeBasisPoints: number;
+    collection?: string;
+    uses?: Uses;
   },
   progressCallback: Dispatch<SetStateAction<number>>,
   maxSupply?: number,
@@ -121,7 +131,7 @@ export const mintNFT = async (
   ];
 
   const { instructions: pushInstructions, signers: pushSigners } =
-    await prepPayForFilesTxn(wallet, realFiles, metadata);
+    await prepPayForFilesTxn(wallet, realFiles);
 
   progressCallback(1);
 

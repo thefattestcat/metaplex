@@ -12,7 +12,7 @@ export interface ArtSelectorProps extends ButtonProps {
 }
 
 export const ArtSelector = (props: ArtSelectorProps) => {
-  const { selected, setSelected, allowMultiple, ...rest } = props;
+  const { selected, setSelected, allowMultiple } = props;
   let items = useUserArts();
   if (props.filter) items = items.filter(props.filter);
   const selectedItems = useMemo<Set<string>>(
@@ -74,7 +74,7 @@ export const ArtSelector = (props: ArtSelectorProps) => {
         onOk={confirm}
         width={1100}
         footer={null}
-        className={'modalp-40'}
+        className={'modalp-40 big-modal'}
       >
         <Row className="call-to-action" style={{ marginBottom: 0 }}>
           <h2>Select the NFT you want to sell</h2>
